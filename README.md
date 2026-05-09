@@ -287,8 +287,51 @@ sudo chmod +x /opt/vixp/scripts/add-peer.sh
 ```
 
 Step 4.3: Create Peer Removal Script (remove-peer.sh)
+```bash
+#!/bin/bash
+# vIXP WireGuard Peer Removal Script
+# Usage: remove-peer.sh <student-id>
 
-Same as original — install on both VMs.
+STUDENT_ID=$1
+
+if [ -z "$STUDENT_ID" ]; then
+    echo "Usage: $0 <student-id>"
+    exit 1
+fi
+
+echo "Removing peer: $STUDENT_ID"
+
+PEER_FILE="/etc/wireguard/peers.conf"
+KEY_DIR="/etc/wireguard/keys/students"
+CONFIG_DIR="/opt/vixp/configs"
+
+# Remove peer from WireGuard runtime first
+# Find the public key
+PUB_KEY_FILE="$KEY_DIR/${STUDENT_ID}.pub"  # Note: Changed from -public.key to .pub
+
+if [ -f "$PUB_KEY_FILE" ]; then
+    PUB_KEY=$(sudo cat "$PUB_KEY_FILE")
+    sudo wg set wg0 peer "$PUB_KEY" remove
+    echo "Peer removed from WireGuard runtime"
+fi
+
+# Remove peer block from peers.conf (if it exists)
+if [ -f "$PEER_FILE" ]; then
+    sudo sed -i "/# Student: $STUDENT_ID/,/^$/d" "$PEER_FILE"
+    # Re-sync configuration (optional, since we already removed via wg set)
+    if [ -s "$PEER_FILE" ]; then
+        sudo wg syncconf wg0 <(cat /etc/wireguard/wg0.conf "$PEER_FILE") 2>/dev/null
+    fi
+fi
+
+# Clean up keys and config
+sudo rm -f "$KEY_DIR/${STUDENT_ID}.pub"  # Match your add script naming
+sudo rm -f "$KEY_DIR/${STUDENT_ID}-private.key"  # If you have private keys stored
+sudo rm -f "$CONFIG_DIR/${STUDENT_ID}.conf"
+
+echo "SUCCESS: Peer $STUDENT_ID removed"
+sudo wg show
+```
 
 Step 4.4: Create Empty Peers File (Both VMs)
 
@@ -297,8 +340,36 @@ sudo touch /etc/wireguard/peers.conf
 ```
 
 Step 4.5: Create Full Reset Script (reset-all.sh)
+```bash
+sudo nano /opt/vixp/scripts/reset-all.sh
+Content:
+bash
+#!/bin/bash
+# vIXP Full VPN Reset
+# Removes all student peers and regenerations keys
 
-Same as original — install on both VMs.
+echo "WARNING: This will remove ALL student WireGuard peers."
+read -p "Are you sure? (yes/no): " CONFIRM
+
+if [ "$CONFIRM" != "yes" ]; then
+    echo "Aborted."
+    exit 0
+fi
+
+# Clear all peers
+sudo truncate -s 0 /etc/wireguard/peers.conf
+sudo wg syncconf wg0 <(cat /etc/wireguard/wg0.conf)
+
+# Remove all student keys and configs
+sudo rm -rf /etc/wireguard/keys/students/*
+sudo rm -rf /opt/vixp/configs/*
+
+echo "All peers removed. System reset complete."
+```
+
+```bash
+sudo chmod +x /opt/vixp/scripts/reset-all.sh
+```
 
 ---
 
