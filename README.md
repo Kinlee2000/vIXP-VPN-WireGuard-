@@ -306,27 +306,29 @@ KEY_DIR="/etc/wireguard/keys/students"
 CONFIG_DIR="/opt/vixp/configs"
 
 # Remove peer from WireGuard runtime first
-# Find the public key
-PUB_KEY_FILE="$KEY_DIR/${STUDENT_ID}.pub"  # Note: Changed from -public.key to .pub
+PUB_KEY_FILE="$KEY_DIR/${STUDENT_ID}-public.key"
 
 if [ -f "$PUB_KEY_FILE" ]; then
     PUB_KEY=$(sudo cat "$PUB_KEY_FILE")
     sudo wg set wg0 peer "$PUB_KEY" remove
     echo "Peer removed from WireGuard runtime"
+else
+    echo "Warning: Public key file not found at $PUB_KEY_FILE"
 fi
 
-# Remove peer block from peers.conf (if it exists)
+# Remove peer block from peers.conf
 if [ -f "$PEER_FILE" ]; then
     sudo sed -i "/# Student: $STUDENT_ID/,/^$/d" "$PEER_FILE"
-    # Re-sync configuration (optional, since we already removed via wg set)
     if [ -s "$PEER_FILE" ]; then
-        sudo wg syncconf wg0 <(cat /etc/wireguard/wg0.conf "$PEER_FILE") 2>/dev/null
+        sudo bash -c 'wg syncconf wg0 <(cat /etc/wireguard/wg0.conf /etc/wireguard/peers.conf)' 2>/dev/null
+    else
+        sudo bash -c 'wg syncconf wg0 <(cat /etc/wireguard/wg0.conf)' 2>/dev/null
     fi
 fi
 
 # Clean up keys and config
-sudo rm -f "$KEY_DIR/${STUDENT_ID}.pub"  # Match your add script naming
-sudo rm -f "$KEY_DIR/${STUDENT_ID}-private.key"  # If you have private keys stored
+sudo rm -f "$KEY_DIR/${STUDENT_ID}-private.key"
+sudo rm -f "$KEY_DIR/${STUDENT_ID}-public.key"
 sudo rm -f "$CONFIG_DIR/${STUDENT_ID}.conf"
 
 echo "SUCCESS: Peer $STUDENT_ID removed"
