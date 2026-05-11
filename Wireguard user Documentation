@@ -1,1 +1,83 @@
+WireGuard Installation Guide
+This guide explains how to download and install WireGuard on Windows, macOS, and Linux systems in a simple step-by-step format.
+
+Things You Need Before Starting
+•	Laptop or desktop computer
+•	Internet connection
+•	WireGuard application
+•	VPN configuration file (.conf) from the lecturer or server administrator
+
+A. Download the WireGuard App
+1.	Open your web browser.
+2.	Go to the official WireGuard website https://www.wireguard.com/install/
+3.	Choose your operating system: Windows, macOS, or Linux.
+
+
+
+4.	Download the installer or follow the installation instructions for your system.
+
+
+B. Install WireGuard on Windows
+1.	Open the downloaded WireGuard installer file.
+
+2.	If Windows asks for permission, click Yes.
+3.	Follow the installation wizard.
+4.	Click Install.
+5.	Wait for the installation to finish.
+
+ 
+
+
+6.	Open the WireGuard application.
+7.	To connect to a VPN, click ‘Import tunnel(s) from file’.
+
+
+8.	Select your .conf configuration file.
+9.	Click Activate to start the VPN.
+
+C. Install WireGuard on macOS
+1. 	Go to the downloads and select the exe. File that you downloaded.
+2. 	Click Get or Install.
+3. Open the WireGuard application after installation.
+4. Click ‘Import tunnel(s) from file’.
+5. Choose your .conf VPN configuration file that you downloaded from the website. 
+6. Click Activate to connect.
+
+
+
+
+
+
+
+D. Install WireGuard on Linux (Ubuntu/Debian)
+1.	Open Terminal.
+
+2.	Update package list using:
+ sudo apt update
+3.	Install WireGuard using: 
+sudo apt install wireguard -y
+
+4.	Check installation using: wg –version
+
+5.	To start WireGuard later, use your VPN configuration file.
+
+
+5. Understanding the Configuration File
+•	A WireGuard VPN connection requires a .conf file.
+•	This file contains VPN settings, keys, and server information.
+•	Each student or user should have their own unique configuration file.
+•	Do not share private keys with others.
+
+
+6. Example WireGuard Configuration
+•	[Interface]
+•	PrivateKey = your_private_key
+•	Address = 10.0.0.4/24
+•	
+•	[Peer]
+•	PublicKey = server_public_key
+•	Endpoint = server_public_ip:51820
+•	AllowedIPs = 10.0.0.0/24
+
+
 
