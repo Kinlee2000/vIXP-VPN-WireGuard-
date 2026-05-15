@@ -398,8 +398,33 @@ ssh-copy-id -i ~/.ssh/vixp-vm2.pub ubuntu@<vm2-private-ip>
 ```
 
 Step 5.3: Create Wrapper Script (Both VM1 and VM2)
+```bash
+sudo nano /opt/vixp/scripts/wrapper.sh
+```
+```bash
+#!/bin/bash
+# vIXP Peer Management Wrapper
+# Accepts commands: add <id> <ip>, remove <id>, status, reset
 
-Same wrapper script as original — install on both VMs.
+case "$1" in
+    add)
+        /opt/vixp/scripts/add-peer.sh "$2" "$3"
+        ;;
+    remove)
+        /opt/vixp/scripts/remove-peer.sh "$2"
+        ;;
+    status)
+        sudo wg show
+        ;;
+    reset)
+        /opt/vixp/scripts/reset-all.sh
+        ;;
+    *)
+        echo "Usage: add <id> <ip> | remove <id> | status | reset"
+        exit 1
+        ;;
+esac
+```
 
 Step 5.4: Test from Portal VM
 
