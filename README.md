@@ -62,7 +62,7 @@ sudo chmod 440 /etc/sudoers.d/vixp-service
 ---
 
 ## Step 6: Update `wg_manager.py` — Make It Generic
-
+```bash
 import subprocess
 
 # Service account settings
