@@ -1,3 +1,139 @@
+# troubleshooting
+
+The cleanest solution is to create a **dedicated service account** that the portal uses regardless of who's logged in. Here's how:
+
+---
+
+## Step 1: Create a Service User on All VMs
+
+On VM1, VM2, and VM3:
+
+```bash
+sudo useradd -m -s /bin/bash vixp-service
+sudo usermod -aG sudo vixp-service
+```
+
+This account is **only for automation** — not for humans.
+
+---
+
+## Step 2: Generate SSH Key for the Service Account on VM3
+
+```bash
+sudo -u vixp-service ssh-keygen -t ed25519 -f /home/vixp-service/.ssh/vixp-key -N "" -C "vixp-service@vm3"
+```
+
+---
+
+## Step 3: Copy the Key to VM1 and VM2
+
+From VM3:
+
+```bash
+sudo -u vixp-service ssh-copy-id -i /home/vixp-service/.ssh/vixp-key vixp-service@151.158.219.194
+sudo -u vixp-service ssh-copy-id -i /home/vixp-service/.ssh/vixp-key vixp-service@151.158.219.195
+```
+
+---
+
+## Step 4: Restrict the Key on VM1 and VM2
+
+On VM1 and VM2:
+
+```bash
+sudo nano /home/vixp-service/.ssh/authorized_keys
+```
+
+Add `command=` before the key:
+
+```
+command="/opt/vixp/scripts/wrapper.sh $SSH_ORIGINAL_COMMAND",no-port-forwarding,no-x11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAAC... vixp-service@vm3
+```
+
+---
+
+## Step 5: Sudoers for vixp-service on VM1 and VM2
+
+```bash
+echo "vixp-service ALL=(ALL) NOPASSWD: /usr/bin/wg, /opt/vixp/scripts/*, /usr/bin/mkdir, /usr/bin/tee, /usr/bin/cat, /usr/bin/chmod, /usr/bin/cp, /usr/bin/rm, /usr/bin/truncate, /usr/bin/bash, /usr/sbin/wg" | sudo tee /etc/sudoers.d/vixp-service
+sudo chmod 440 /etc/sudoers.d/vixp-service
+```
+
+---
+
+## Step 6: Update `wg_manager.py` — Make It Generic
+
+```python
+import subprocess
+
+# Service account settings
+WG_SSH_KEY = '/home/vixp-service/.ssh/vixp-key'
+
+# IXP Servers
+IXP_SERVERS = {
+    'east': {
+        'host': '151.158.219.194',
+        'user': 'vixp-service',
+        'subnet': '10.0.1'
+    },
+    'west': {
+        'host': '151.158.219.195',
+        'user': 'vixp-service',
+        'subnet': '10.0.2'
+    }
+}
+
+def add_peer_to_ixp(student_id, wg_ip, ixp='east'):
+    """Generic function — works regardless of which admin is logged in"""
+    server = IXP_SERVERS[ixp]
+    
+    result = subprocess.run([
+        "ssh", "-i", WG_SSH_KEY,
+        f"{server['user']}@{server['host']}",
+        "/opt/vixp/scripts/wrapper.sh", "add",
+        student_id, wg_ip
+    ], capture_output=True, text=True, timeout=30)
+    
+    if "SUCCESS" not in result.stdout:
+        raise Exception(f"Failed: {result.stderr}")
+    
+    return result.stdout
+```
+
+---
+
+## Why This Works
+
+| Before | After |
+|--------|-------|
+| Uses `declan00` or `kinley00` (personal accounts) | Uses `vixp-service` (system account) |
+| Changes when people leave | Always works |
+| Different per team member | One shared service account |
+| SSH key tied to one person | Key stored on VM3 for automation |
+
+---
+
+The portal code calls `add_peer_to_ixp()` with the student ID and IP — it doesn't care who clicked "Approve". The service account handles everything.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # vIXP-VPN-WireGuard-
 
 Core Tasks
