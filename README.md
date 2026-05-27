@@ -63,41 +63,103 @@ sudo chmod 440 /etc/sudoers.d/vixp-service
 
 ## Step 6: Update `wg_manager.py` — Make It Generic
 
-```python
 import subprocess
 
 # Service account settings
 WG_SSH_KEY = '/home/vixp-service/.ssh/vixp-key'
+
+# WireGuard server details
+WG_SERVER_PUBLIC_KEY_EAST = 'qaTDswDheBU0VS+Ny34RDhhJHrhffeZddh5hke7eb3M='
+WG_SERVER_PUBLIC_KEY_WEST = 'UumLkLs1ooUNWr+9bImrhNncjAk+1aPN+Dh/Msvdo38='
 
 # IXP Servers
 IXP_SERVERS = {
     'east': {
         'host': '151.158.219.194',
         'user': 'vixp-service',
-        'subnet': '10.0.1'
+        'subnet': '10.0.1',
+        'endpoint': '151.158.219.194:51820',
+        'server_public_key': WG_SERVER_PUBLIC_KEY_EAST
     },
     'west': {
         'host': '151.158.219.195',
         'user': 'vixp-service',
-        'subnet': '10.0.2'
+        'subnet': '10.0.2',
+        'endpoint': '151.158.219.195:51820',
+        'server_public_key': WG_SERVER_PUBLIC_KEY_WEST
     }
 }
 
+# Tunnel IP pool
+TUNNEL_IP_POOL_START = 10
+TUNNEL_IP_POOL_END = 250
+
+
+def allocate_tunnel_ip(ixp='east'):
+    """Find the next available tunnel IP in the pool."""
+    from pages.models import ParticipantRegistration
+
+    subnet = IXP_SERVERS[ixp]['subnet']
+    used_ips = set(
+        ParticipantRegistration.objects.exclude(tunnel_ip=None)
+        .values_list('tunnel_ip', flat=True)
+    )
+    for i in range(TUNNEL_IP_POOL_START, TUNNEL_IP_POOL_END + 1):
+        candidate = f'{subnet}.{i}'
+        if candidate not in used_ips:
+            return candidate
+
+    raise RuntimeError('No tunnel IPs available in the pool.')
+
+
 def add_peer_to_ixp(student_id, wg_ip, ixp='east'):
-    """Generic function — works regardless of which admin is logged in"""
+    """Add a WireGuard peer on the IXP server via SSH."""
     server = IXP_SERVERS[ixp]
-    
+
     result = subprocess.run([
         "ssh", "-i", WG_SSH_KEY,
         f"{server['user']}@{server['host']}",
         "/opt/vixp/scripts/wrapper.sh", "add",
         student_id, wg_ip
     ], capture_output=True, text=True, timeout=30)
-    
+
     if "SUCCESS" not in result.stdout:
-        raise Exception(f"Failed: {result.stderr}")
-    
+        raise RuntimeError(f"Peer addition failed: {result.stderr}")
+
     return result.stdout
+
+
+def remove_peer_from_ixp(student_id, ixp='east'):
+    """Remove a WireGuard peer from the IXP server via SSH."""
+    server = IXP_SERVERS[ixp]
+
+    result = subprocess.run([
+        "ssh", "-i", WG_SSH_KEY,
+        f"{server['user']}@{server['host']}",
+        "/opt/vixp/scripts/wrapper.sh", "remove",
+        student_id
+    ], capture_output=True, text=True, timeout=30)
+
+    if "SUCCESS" not in result.stdout:
+        raise RuntimeError(f"Peer removal failed: {result.stderr}")
+
+    return result.stdout
+
+
+def build_client_config(tunnel_ip, private_key, ixp='east'):
+    """Return the WireGuard config file content to send to the student."""
+    server = IXP_SERVERS[ixp]
+    return f"""[Interface]
+Address = {tunnel_ip}/24
+PrivateKey = {private_key}
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = {server['server_public_key']}
+Endpoint = {server['endpoint']}
+AllowedIPs = {server['subnet']}.0/24
+PersistentKeepalive = 25
+"""
 ```
 
 ---
